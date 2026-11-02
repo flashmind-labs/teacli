@@ -26,7 +26,7 @@ import (
 // downloaded from, so it can be pointed at a mirror.
 const (
 	defaultReleaseHost = "https://github.com"
-	defaultUpdateRepo  = "rayfish/teacli"
+	defaultUpdateRepo  = "flashmind-labs/teacli"
 )
 
 var updateCmd = &cobra.Command{

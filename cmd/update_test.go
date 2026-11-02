@@ -248,3 +248,11 @@ func TestUpdaterTimeoutIsSet(t *testing.T) {
 		t.Error("update client has no timeout")
 	}
 }
+
+func TestDefaultUpdateRepository(t *testing.T) {
+	up := &updater{host: defaultReleaseHost, repo: defaultUpdateRepo}
+	want := "https://api.github.com/repos/flashmind-labs/teacli/releases/latest"
+	if got := up.latestEndpoint(); got != want {
+		t.Fatalf("latestEndpoint() = %q, want %q", got, want)
+	}
+}

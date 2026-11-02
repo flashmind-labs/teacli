@@ -37,7 +37,7 @@ reference and [AGENTS.md](AGENTS.md) for the usage rules.
 ### Quick install (curl)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/rayfish/teacli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/flashmind-labs/teacli/main/install.sh | sh
 ```
 
 This downloads the binary for your OS and architecture, verifies it against the
@@ -46,12 +46,12 @@ with environment variables:
 
 ```bash
 # Pin a version and install somewhere on your PATH without sudo
-TEACLI_VERSION=v1.0.0 TEACLI_INSTALL_DIR="$HOME/.local/bin" \
-  curl -fsSL https://raw.githubusercontent.com/rayfish/teacli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/flashmind-labs/teacli/main/install.sh | \
+  TEACLI_VERSION=v1.0.0 TEACLI_INSTALL_DIR="$HOME/.local/bin" sh
 ```
 
 Supported variables: `TEACLI_RELEASE_HOST` (default `https://github.com`),
-`TEACLI_RELEASE_REPO` (default `rayfish/teacli`), `TEACLI_VERSION`
+`TEACLI_RELEASE_REPO` (default `flashmind-labs/teacli`), `TEACLI_VERSION`
 (default `latest`), `TEACLI_INSTALL_DIR` (default `/usr/local/bin`). The release
 host is only where binaries are downloaded from, so pointing it at your own
 Gitea or Forgejo instance installs from a mirror. Linux and macOS only; on

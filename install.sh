@@ -3,7 +3,7 @@
 # installs it. All settings are overridable via environment variables:
 #
 #   TEACLI_RELEASE_HOST  where releases live   (default: https://github.com)
-#   TEACLI_RELEASE_REPO  owner/repo            (default: rayfish/teacli)
+#   TEACLI_RELEASE_REPO  owner/repo            (default: flashmind-labs/teacli)
 #   TEACLI_VERSION       tag or "latest"       (default: latest)
 #   TEACLI_INSTALL_DIR   install directory     (default: /usr/local/bin)
 #
@@ -12,12 +12,12 @@
 # Forgejo instance to install from a mirror.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/rayfish/teacli/main/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/flashmind-labs/teacli/main/install.sh | sh
 #   TEACLI_VERSION=v1.0.0 ./install.sh
 set -eu
 
 RELEASE_HOST="${TEACLI_RELEASE_HOST:-https://github.com}"
-RELEASE_REPO="${TEACLI_RELEASE_REPO:-rayfish/teacli}"
+RELEASE_REPO="${TEACLI_RELEASE_REPO:-flashmind-labs/teacli}"
 TEACLI_VERSION="${TEACLI_VERSION:-latest}"
 INSTALL_DIR="${TEACLI_INSTALL_DIR:-/usr/local/bin}"
 BIN_NAME="teacli"

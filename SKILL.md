@@ -9,7 +9,7 @@ A fully non-interactive command-line tool for Gitea and Forgejo, designed for sc
 
 ## Overview
 
-**Repository:** `https://github.com/rayfish/teacli`
+**Repository:** `https://github.com/flashmind-labs/teacli`
 
 **Purpose:** Gitea/Forgejo CLI built on cobra + pflag. No prompts, no confirmations, no TTY needed. Forgejo is covered because it serves the same `/api/v1` surface.
 
@@ -34,7 +34,7 @@ instead of assuming. The schema is generated from the binary and is always curre
 
 ```bash
 # Quick install (Linux/macOS)
-curl -fsSL https://raw.githubusercontent.com/rayfish/teacli/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/flashmind-labs/teacli/main/install.sh | sh
 
 # Or with the Go toolchain
 go install github.com/rayfish/teacli@latest
