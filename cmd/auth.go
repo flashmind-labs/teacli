@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/rayfish/teacli/modules/config"
@@ -67,8 +68,7 @@ var authConfigUnsetCmd = &cobra.Command{
 }
 
 func init() {
-	authLoginCmd.Flags().StringP("token", "t", "", "Gitea API token (required)")
-	authLoginCmd.MarkFlagRequired("token")
+	authLoginCmd.Flags().StringP("token", "t", "", "Gitea API token (defaults to GITHUB_TOKEN)")
 	authLoginCmd.Flags().StringP("name", "n", "", "Server name for config (defaults to server hostname)")
 	authLoginCmd.Flags().Bool("default", false, "Set as default server")
 
@@ -80,8 +80,7 @@ func init() {
 		Args:  cobra.ExactArgs(1),
 		RunE:  runAuthLogin,
 	}
-	loginAliasCmd.Flags().StringP("token", "t", "", "Gitea API token (required)")
-	loginAliasCmd.MarkFlagRequired("token")
+	loginAliasCmd.Flags().StringP("token", "t", "", "Gitea API token (defaults to GITHUB_TOKEN)")
 	loginAliasCmd.Flags().StringP("name", "n", "", "Server name for config (defaults to server hostname)")
 	loginAliasCmd.Flags().Bool("default", false, "Set as default server")
 
@@ -106,8 +105,11 @@ func runAuthLogin(cmd *cobra.Command, args []string) error {
 	}
 
 	token, _ := cmd.Flags().GetString("token")
+	if !cmd.Flags().Changed("token") && token == "" {
+		token = os.Getenv("GITHUB_TOKEN")
+	}
 	if token == "" {
-		return errors.NewValidationError("token is required (--token)",
+		return errors.NewValidationError("token is required (--token or GITHUB_TOKEN)",
 			map[string]interface{}{"missing_flags": []string{"--token"}})
 	}
 

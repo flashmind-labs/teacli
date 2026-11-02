@@ -69,12 +69,18 @@ sudo. `--no-verify` skips the checksum check, which you should not need.
 teacli auth login --token <api-token> <server-url>
 teacli auth login <server-url> --token <api-token>  # Also works
 
+# In Actions, login can read GITHUB_TOKEN from the environment
+teacli auth login "$GITHUB_SERVER_URL"
+
 # Set as default server
 teacli auth login --token abc123 https://gitea.example.com --default
 ```
 
 `teacli login` and `teacli logout` are top-level aliases for `teacli auth login`
 and `teacli auth logout`.
+
+Login uses `GITHUB_TOKEN` when `--token` is omitted; an explicit `--token` takes
+precedence. Login saves the token in the config file, including Actions tokens.
 
 ### View and Edit Configuration
 
@@ -914,11 +920,12 @@ colliding with subcommand-specific flags):
 
 ## Environment
 
-The binary reads two variables:
+The binary reads these variables:
 
 - `TEACLI_FORMAT` - default output format, overridden by `--format`
 - `TEACLI_TARGET_REPO` - `owner/repo` to use when the repository is omitted,
   overriding git remote detection
+- `GITHUB_TOKEN` - fallback token for `auth login` and `login`
 
 (`TEACLI_RELEASE_REPO` belongs to `install.sh`, not to teacli itself.)
 

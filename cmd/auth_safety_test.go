@@ -58,6 +58,52 @@ func TestAuthLoginDryRunDoesNotCreateConfig(t *testing.T) {
 	}
 }
 
+func TestAuthLoginTokenSources(t *testing.T) {
+	for _, tt := range []struct {
+		name, env, flag, want string
+		setFlag, wantError    bool
+	}{
+		{name: "environment", env: "environment-token", want: "environment-token"},
+		{name: "explicit token wins", env: "environment-token", flag: "flag-token", setFlag: true, want: "flag-token"},
+		{name: "missing token", wantError: true},
+		{name: "explicit empty token", env: "environment-token", setFlag: true, wantError: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_TOKEN", tt.env)
+			oldPath := configPath
+			configPath = filepath.Join(t.TempDir(), "config.ini")
+			t.Cleanup(func() { configPath = oldPath })
+			cmd := authTestCommand(false)
+			if err := cmd.Flags().Lookup("token").Value.Set(""); err != nil {
+				t.Fatal(err)
+			}
+			if tt.setFlag {
+				if err := cmd.Flags().Set("token", tt.flag); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := runAuthLogin(cmd, []string{"https://forge.example.com"})
+			if tt.wantError {
+				if err == nil {
+					t.Fatal("expected missing token error")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := config.LoadFrom(configPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			server, err := cfg.GetServer("new")
+			if err != nil || server.Token != tt.want {
+				t.Fatalf("saved token did not match expected value: %v", err)
+			}
+		})
+	}
+}
+
 func TestAuthLogoutDefaultUsesConfiguredName(t *testing.T) {
 	oldPath := configPath
 	configPath = filepath.Join(t.TempDir(), "config.ini")
