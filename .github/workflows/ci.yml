@@ -45,6 +45,14 @@ jobs:
         with:
           go-version: '1.23'
 
+      - name: Cache cross-compiled packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: crossbuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            crossbuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-
+
       # The release job builds these five targets, so a break in any of them
       # should show up on the PR rather than at tag time.
       - name: Build every release target

@@ -18,6 +18,14 @@ jobs:
         with:
           go-version: '1.23'
 
+      - name: Restore cross-compiled packages
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/go-build
+          key: crossbuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+          restore-keys: |
+            crossbuild-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('go.sum') }}-
+
       - name: Build binaries
         run: |
           mkdir -p dist
