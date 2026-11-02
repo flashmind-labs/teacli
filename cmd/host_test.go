@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +13,50 @@ import (
 	"github.com/rayfish/teacli/modules/errors"
 	"github.com/spf13/cobra"
 )
+
+func TestActionsEnvironment(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/repos/example/project" || r.Header.Get("Authorization") != "token job-token" {
+			t.Errorf("unexpected request: %s, authorization present: %t", r.URL.Path, r.Header.Get("Authorization") != "")
+		}
+		fmt.Fprint(w, `{}`)
+	}))
+	defer srv.Close()
+	setHostConfig(t, "[other]\nurl = https://other.example.com\ntoken = saved-token\n", "")
+	t.Setenv("GITHUB_SERVER_URL", srv.URL)
+	t.Setenv("GITHUB_TOKEN", "job-token")
+	t.Setenv("GITHUB_REPOSITORY", "example/project")
+	t.Setenv("TEACLI_TARGET_REPO", "")
+	detected, err := detectCurrentRepo()
+	if err != nil || detected.Owner != "example" || detected.Repo != "project" {
+		t.Fatalf("repository detection = %+v, %v", detected, err)
+	}
+	resp, err := apiDo(&cobra.Command{}, http.MethodGet, "repos/"+detected.Owner+"/"+detected.Repo, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	hostName = "other"
+	server, err := getServer(&cobra.Command{})
+	if err != nil || server.URL != "https://other.example.com" || server.Token != "saved-token" {
+		t.Fatalf("explicit server was not selected: %v", err)
+	}
+}
+
+func TestActionsEnvironmentRejectsInvalidValues(t *testing.T) {
+	setHostConfig(t, "", "")
+	t.Setenv("GITHUB_TOKEN", "job-token")
+	t.Setenv("GITHUB_SERVER_URL", "invalid")
+	if _, err := getServer(&cobra.Command{}); errors.ExitCode(err) != errors.ExitValidationError {
+		t.Fatalf("invalid URL: %v", err)
+	}
+	t.Setenv("GITHUB_SERVER_URL", "https://forge.example.com")
+	t.Setenv("GITHUB_REPOSITORY", "invalid")
+	t.Setenv("TEACLI_TARGET_REPO", "")
+	if _, err := detectCurrentRepo(); errors.ExitCode(err) != errors.ExitValidationError {
+		t.Fatalf("invalid repository: %v", err)
+	}
+}
 
 func TestHostSelection(t *testing.T) {
 	const one = "[primary]\nurl = https://forge.example.com\n"

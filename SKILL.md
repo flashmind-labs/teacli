@@ -82,6 +82,18 @@ and `teacli auth logout`.
 Login uses `GITHUB_TOKEN` when `--token` is omitted; an explicit `--token` takes
 precedence. Login saves the token in the config file, including Actions tokens.
 
+In an Actions job, no login is needed when `GITHUB_SERVER_URL` and `GITHUB_TOKEN`
+are set. They select the server and token for that process, ahead of saved
+configuration. Map the Gitea job secret into the environment, for example:
+
+```yaml
+env:
+  GITHUB_TOKEN: ${{ secrets.GITEA_TOKEN }}
+```
+
+The runner supplies `GITHUB_SERVER_URL` and `GITHUB_REPOSITORY`.
+`--host` or `--server` selects saved credentials instead.
+
 ### View and Edit Configuration
 
 ```bash
@@ -926,6 +938,9 @@ The binary reads these variables:
 - `TEACLI_TARGET_REPO` - `owner/repo` to use when the repository is omitted,
   overriding git remote detection
 - `GITHUB_TOKEN` - fallback token for `auth login` and `login`
+- `GITHUB_SERVER_URL` and `GITHUB_TOKEN` - Actions server and token for API commands
+- `GITHUB_REPOSITORY` - repository to infer when using the Actions server;
+  `TEACLI_TARGET_REPO` takes precedence
 
 (`TEACLI_RELEASE_REPO` belongs to `install.sh`, not to teacli itself.)
 

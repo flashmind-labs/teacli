@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/rayfish/teacli/internal/utils"
-	"github.com/rayfish/teacli/modules/config"
 	"github.com/rayfish/teacli/modules/errors"
 	"github.com/rayfish/teacli/modules/gitremote"
 
@@ -71,11 +70,7 @@ func inferenceError(cmd *cobra.Command, err error) error {
 // servers. The variable is named apart from install.sh's TEACLI_REPO, which
 // says which repository to download teacli itself from.
 func detectCurrentRepo() (*gitremote.Detected, error) {
-	cfg, err := config.LoadFrom(configPath)
-	if err != nil {
-		return nil, errors.NewGeneralError(fmt.Sprintf("failed to load config: %v", err))
-	}
-	name, err := selectedServer(cfg)
+	name, server, err := resolveServer()
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +81,16 @@ func detectCurrentRepo() (*gitremote.Detected, error) {
 		}
 		return &gitremote.Detected{Remote: "TEACLI_TARGET_REPO", Server: name, Owner: owner, Repo: repo}, nil
 	}
-	dir, err := os.Getwd()
-	if err != nil {
-		return nil, err
+	if useActionsServer() {
+		if env := os.Getenv("GITHUB_REPOSITORY"); env != "" {
+			owner, repo, err := utils.ParseRepoArg(env)
+			if err != nil {
+				return nil, errors.NewValidationError("invalid GITHUB_REPOSITORY: "+err.Error(), nil)
+			}
+			return &gitremote.Detected{Remote: "GITHUB_REPOSITORY", Server: name, Owner: owner, Repo: repo}, nil
+		}
 	}
-	server, err := cfg.GetServer(name)
+	dir, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}

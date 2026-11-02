@@ -37,7 +37,7 @@ var RootCmd = &cobra.Command{
 Nothing prompts, output is text by default and JSON on request, and every error
 maps onto a documented exit code, so it works the same in a terminal, in a CI
 job, and in the hands of an AI agent.`,
-	Version:       "1.0.6",
+	Version:       "1.0.7",
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -62,15 +62,33 @@ func init() {
 
 // getServer selects an explicit instance, the only instance, or one matching a git remote.
 func getServer(cmd *cobra.Command) (*config.ServerConfig, error) {
+	_, server, err := resolveServer()
+	return server, err
+}
+
+func useActionsServer() bool {
+	return hostName == "" && serverName == "" && os.Getenv("GITHUB_TOKEN") != "" && os.Getenv("GITHUB_SERVER_URL") != ""
+}
+
+func resolveServer() (string, *config.ServerConfig, error) {
+	if useActionsServer() {
+		serverURL := os.Getenv("GITHUB_SERVER_URL")
+		u, err := url.Parse(serverURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return "", nil, errors.NewValidationError("invalid GITHUB_SERVER_URL", nil)
+		}
+		return "GITHUB_SERVER_URL", &config.ServerConfig{URL: serverURL, Token: os.Getenv("GITHUB_TOKEN")}, nil
+	}
 	cfg, err := config.LoadFrom(configPath)
 	if err != nil {
-		return nil, errors.NewGeneralError(fmt.Sprintf("failed to load config: %v", err))
+		return "", nil, errors.NewGeneralError(fmt.Sprintf("failed to load config: %v", err))
 	}
 	name, err := selectedServer(cfg)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-	return cfg.GetServer(name)
+	server, err := cfg.GetServer(name)
+	return name, server, err
 }
 
 func selectedServer(cfg *config.Config) (string, error) {
