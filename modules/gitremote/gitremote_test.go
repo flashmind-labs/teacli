@@ -240,3 +240,14 @@ func TestDetectWhenNoRemoteMatchesAConfiguredServer(t *testing.T) {
 		t.Errorf("HostMismatchError.Host = %q, want github.com", mismatch.Host)
 	}
 }
+
+func TestDetectRejectsAmbiguousServers(t *testing.T) {
+	dir := gitRepo(t, "origin", "git@forge.example.com:owner/repo.git")
+	servers := []Server{
+		{Name: "first", URL: "https://forge.example.com"},
+		{Name: "second", URL: "http://forge.example.com:3000"},
+	}
+	if _, err := Detect(dir, servers); !errors.Is(err, ErrAmbiguousServer) {
+		t.Fatalf("Detect error = %v, want ErrAmbiguousServer", err)
+	}
+}

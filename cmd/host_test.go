@@ -63,7 +63,7 @@ func setHostConfig(t *testing.T, body, host string) {
 	}
 }
 
-func TestRepositoryDetectionRequiresHostWithMultipleInstances(t *testing.T) {
+func TestRepositoryDetectionSelectsServerFromRemote(t *testing.T) {
 	t.Setenv("TEACLI_TARGET_REPO", "")
 	setHostConfig(t, "[global]\ndefault_server = primary\n[primary]\nurl = https://forge.example.com\n[secondary]\nurl = https://other.example.com\n", "")
 	dir := t.TempDir()
@@ -88,11 +88,22 @@ func TestRepositoryDetectionRequiresHostWithMultipleInstances(t *testing.T) {
 			t.Error(err)
 		}
 	})
-	if _, err := detectCurrentRepo(); errors.ExitCode(err) != errors.ExitValidationError || !strings.Contains(err.Error(), "specify --host") {
-		t.Fatalf("detectCurrentRepo error = %v, want --host required", err)
-	}
-	hostName = "secondary"
 	detected, err := detectCurrentRepo()
+	if err != nil || detected.Server != "primary" || detected.Repo != "widgets" {
+		t.Fatalf("automatic detection = %+v, %v", detected, err)
+	}
+	server, err := getServer(&cobra.Command{})
+	if err != nil || server.URL != "https://forge.example.com" {
+		t.Fatalf("automatic server = %+v, %v", server, err)
+	}
+	t.Setenv("TEACLI_TARGET_REPO", "acme/override")
+	detected, err = detectCurrentRepo()
+	if err != nil || detected.Server != "primary" || detected.Repo != "override" {
+		t.Fatalf("environment override = %+v, %v", detected, err)
+	}
+	t.Setenv("TEACLI_TARGET_REPO", "")
+	hostName = "secondary"
+	detected, err = detectCurrentRepo()
 	if err != nil {
 		t.Fatal(err)
 	}

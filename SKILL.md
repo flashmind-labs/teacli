@@ -91,14 +91,15 @@ if it does not exist yet. Use it to keep a CI or per-project config out of the
 home directory.
 
 Saved config files have mode `0600`. Logout removes the saved server and token;
-omitting its name uses the selected instance, requiring `--host` with multiple
-instances.
+omitting its name uses the selected instance, inferred from the Git remote when possible.
 
 ### Instance selection
 
 With one configured instance, teacli selects it automatically. With more than
-one, `--host` is required, even if a default is configured or a git remote
-matches an instance. Missing or ambiguous hosts exit `2` and ask for `--host`.
+one, it selects the instance matching the current Git remote, preferring origin
+then upstream. If no remote matches or a remote matches multiple instances,
+pass `--host`. A configured default does not resolve ambiguity. Missing or
+ambiguous hosts exit `2` and ask for `--host`.
 
 `--host` accepts a configured name, hostname (including any port), or full server
 URL. Use a configured name when multiple instances share a hostname.
@@ -150,9 +151,8 @@ Details worth knowing:
 - Remotes are tried in the order `origin`, `upstream`, then the rest, and the
   first one that matches the selected instance wins. A fork with `origin` on Gitea
   and `upstream` on GitHub resolves to the Gitea one either way.
-- Remotes are matched only against the selected instance. With multiple
-  instances configured, pass `--host` even when inferring the repository.
-  Naming a repository explicitly still uses the selected instance.
+- With multiple instances, the first matching remote selects the instance.
+  Explicit `--host` overrides this choice, including when a repository is named.
 - `TEACLI_TARGET_REPO=owner/repo` overrides detection, for CI and containers
   with no clone. (`TEACLI_RELEASE_REPO` is a different thing: `install.sh` reads
   it to find teacli's own repository.)
@@ -904,7 +904,7 @@ values exit `2` before making a request.
 Persistent flags available on every subcommand, with no shorthand (to avoid
 colliding with subcommand-specific flags):
 
-- `--host <name|hostname|url>` - Select a configured instance; required with multiple instances
+- `--host <name|hostname|url>` - Select a configured instance; required when automatic detection is ambiguous or unavailable
 - `--server <name|hostname|url>` - Alias for `--host`
 - `--format <format>` - Output format: `text` (default) or `json`
 - `--dry-run` - Show what would be done without making changes

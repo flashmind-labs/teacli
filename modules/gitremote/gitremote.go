@@ -16,6 +16,8 @@ var (
 	ErrNoRepo = errors.New("not in a git repository")
 	// ErrNoRemote reports that the repository has no remotes to read.
 	ErrNoRemote = errors.New("git repository has no remotes")
+	// ErrAmbiguousServer reports that a remote matches multiple configured servers.
+	ErrAmbiguousServer = errors.New("remote matches multiple configured servers")
 )
 
 // HostMismatchError reports that a remote was found but its host belongs to no
@@ -148,7 +150,11 @@ func Detect(dir string, servers []Server) (*Detected, error) {
 		if first == nil {
 			first = remote
 		}
-		if d, ok := match(remote, servers); ok {
+		d, err := match(remote, servers)
+		if err != nil {
+			return nil, err
+		}
+		if d != nil {
 			return d, nil
 		}
 	}
@@ -162,9 +168,10 @@ func Detect(dir string, servers []Server) (*Detected, error) {
 // match finds the server the remote belongs to. Where several share a host,
 // the one with the longest matching path prefix wins, so a subpath install
 // beats a server mounted at the root of the same host.
-func match(remote *Remote, servers []Server) (*Detected, bool) {
+func match(remote *Remote, servers []Server) (*Detected, error) {
 	best := -1
 	var found *Detected
+	ambiguous := false
 	for _, server := range servers {
 		u, err := url.Parse(server.URL)
 		if err != nil || !strings.EqualFold(u.Hostname(), remote.Host) {
@@ -172,13 +179,21 @@ func match(remote *Remote, servers []Server) (*Detected, bool) {
 		}
 		prefix := strings.Trim(u.Path, "/")
 		owner, repo, ok := SplitOwnerRepo(remote.Path, prefix)
-		if !ok || len(prefix) <= best {
+		if !ok || len(prefix) < best {
 			continue
 		}
+		if len(prefix) == best {
+			ambiguous = true
+			continue
+		}
+		ambiguous = false
 		best = len(prefix)
 		found = &Detected{Remote: remote.Name, Server: server.Name, Owner: owner, Repo: repo}
 	}
-	return found, found != nil
+	if ambiguous {
+		return nil, ErrAmbiguousServer
+	}
+	return found, nil
 }
 
 // orderRemotes puts origin first and upstream second, leaving the rest in the

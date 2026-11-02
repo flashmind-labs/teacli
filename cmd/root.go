@@ -11,6 +11,7 @@ import (
 	"code.gitea.io/sdk/gitea"
 	"github.com/rayfish/teacli/modules/config"
 	"github.com/rayfish/teacli/modules/errors"
+	"github.com/rayfish/teacli/modules/gitremote"
 	"github.com/rayfish/teacli/modules/output"
 
 	"github.com/spf13/cobra"
@@ -52,14 +53,14 @@ func Execute() error {
 func init() {
 	RootCmd.PersistentFlags().StringVar(&configPath, "config", "", "Config file path")
 	RootCmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "Verbose output")
-	RootCmd.PersistentFlags().StringVar(&hostName, "host", "", "Configured instance name, hostname, or URL (required with multiple instances)")
+	RootCmd.PersistentFlags().StringVar(&hostName, "host", "", "Configured instance name, hostname, or URL (auto-detected from git remote)")
 	RootCmd.PersistentFlags().StringVar(&serverName, "server", "", "Alias for --host")
 	RootCmd.PersistentFlags().StringVar(&outputFormat, "format", "", "Output format: text (default), json")
 	RootCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without making changes")
 	RootCmd.PersistentFlags().BoolVar(&fetchAll, "all", false, "Auto-paginate list commands and return the full set")
 }
 
-// getServer selects the only configured instance unless an explicit host is given.
+// getServer selects an explicit instance, the only instance, or one matching a git remote.
 func getServer(cmd *cobra.Command) (*config.ServerConfig, error) {
 	cfg, err := config.LoadFrom(configPath)
 	if err != nil {
@@ -88,7 +89,22 @@ func selectedServer(cfg *config.Config) (string, error) {
 		case 1:
 			return names[0], nil
 		default:
-			return "", errors.NewValidationError("multiple instances configured; specify --host <name>", nil)
+			servers := make([]gitremote.Server, 0, len(names))
+			for _, name := range names {
+				server, err := cfg.GetServer(name)
+				if err != nil {
+					return "", err
+				}
+				servers = append(servers, gitremote.Server{Name: name, URL: server.URL})
+			}
+			dir, err := os.Getwd()
+			if err != nil {
+				return "", errors.NewGeneralError(fmt.Sprintf("cannot read current directory: %v", err))
+			}
+			if detected, err := gitremote.Detect(dir, servers); err == nil {
+				return detected.Server, nil
+			}
+			return "", errors.NewValidationError("cannot determine instance from git remote; specify --host <name>", nil)
 		}
 	}
 	if _, err := cfg.GetServer(host); err == nil {
