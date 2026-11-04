@@ -36,6 +36,10 @@ instead of assuming. The schema is generated from the binary and is always curre
 # Quick install (Linux/macOS)
 curl -fsSL https://raw.githubusercontent.com/flashmind-labs/teacli/main/install.sh | sh
 
+# The installer uses ~/.local/bin; add it to PATH if needed.
+# On Windows, download teacli-windows-amd64.exe, rename it to teacli.exe,
+# and place it in a directory on your user PATH.
+
 # Or with the Go toolchain
 go install github.com/rayfish/teacli@latest
 

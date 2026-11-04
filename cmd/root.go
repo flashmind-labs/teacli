@@ -138,7 +138,8 @@ func selectedServer(cfg *config.Config) (string, error) {
 		if err != nil {
 			continue
 		}
-		if !strings.EqualFold(u.Host, host) && strings.TrimRight(server.URL, "/") != strings.TrimRight(host, "/") {
+		// A git remote names the host without the web port.
+		if !strings.EqualFold(u.Host, host) && !strings.EqualFold(u.Hostname(), host) && strings.TrimRight(server.URL, "/") != strings.TrimRight(host, "/") {
 			continue
 		}
 		if matched != "" {

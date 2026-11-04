@@ -5,7 +5,7 @@
 #   TEACLI_RELEASE_HOST  where releases live   (default: https://github.com)
 #   TEACLI_RELEASE_REPO  owner/repo            (default: flashmind-labs/teacli)
 #   TEACLI_VERSION       tag or "latest"       (default: latest)
-#   TEACLI_INSTALL_DIR   install directory     (default: /usr/local/bin)
+#   TEACLI_INSTALL_DIR   install directory     (default: ~/.local/bin)
 #
 # The release host is not the Gitea or Forgejo server teacli talks to; it is
 # only where the binaries are downloaded from. Point it at your own Gitea or
@@ -19,7 +19,7 @@ set -eu
 RELEASE_HOST="${TEACLI_RELEASE_HOST:-https://github.com}"
 RELEASE_REPO="${TEACLI_RELEASE_REPO:-flashmind-labs/teacli}"
 TEACLI_VERSION="${TEACLI_VERSION:-latest}"
-INSTALL_DIR="${TEACLI_INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${TEACLI_INSTALL_DIR:-$HOME/.local/bin}"
 BIN_NAME="teacli"
 
 err() { echo "install: $*" >&2; exit 1; }
@@ -112,4 +112,5 @@ fi
 trap - EXIT
 
 echo "Installed ${BIN_NAME} to ${target}"
+case ":$PATH:" in *":$INSTALL_DIR:"*) ;; *) echo "warning: $INSTALL_DIR is not on your PATH" ;; esac
 "$target" --version 2>/dev/null || true

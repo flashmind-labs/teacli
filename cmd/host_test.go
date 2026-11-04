@@ -75,6 +75,7 @@ func TestHostSelection(t *testing.T) {
 		{name: "explicit name", config: two, host: "secondary", want: "https://other.example.com"},
 		{name: "explicit hostname", config: two, host: "other.example.com", want: "https://other.example.com"},
 		{name: "explicit URL", config: two, host: "https://other.example.com/", want: "https://other.example.com"},
+		{name: "hostname without the port", config: one + "[secondary]\nurl = http://git.example.com:3000\n", host: "git.example.com", want: "http://git.example.com:3000"},
 		{name: "unknown host", config: two, host: "missing", message: "unknown host"},
 		{name: "ambiguous hostname", config: one + "[secondary]\nurl = https://forge.example.com/subpath\n", host: "forge.example.com", message: "matches multiple instances"},
 	}

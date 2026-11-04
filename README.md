@@ -41,21 +41,23 @@ curl -fsSL https://raw.githubusercontent.com/flashmind-labs/teacli/main/install.
 ```
 
 This downloads the binary for your OS and architecture, verifies it against the
-release checksums, and installs it to `/usr/local/bin`. Override any of that
+release checksums, and installs it to `~/.local/bin`. Add that directory to your
+PATH if needed. Override the defaults
 with environment variables:
 
 ```bash
-# Pin a version and install somewhere on your PATH without sudo
+# Pin a version and choose an install directory
 curl -fsSL https://raw.githubusercontent.com/flashmind-labs/teacli/main/install.sh | \
-  TEACLI_VERSION=v1.0.0 TEACLI_INSTALL_DIR="$HOME/.local/bin" sh
+  TEACLI_VERSION=v1.0.0 TEACLI_INSTALL_DIR="$HOME/bin" sh
 ```
 
 Supported variables: `TEACLI_RELEASE_HOST` (default `https://github.com`),
 `TEACLI_RELEASE_REPO` (default `flashmind-labs/teacli`), `TEACLI_VERSION`
-(default `latest`), `TEACLI_INSTALL_DIR` (default `/usr/local/bin`). The release
+(default `latest`), `TEACLI_INSTALL_DIR` (default `~/.local/bin`). The release
 host is only where binaries are downloaded from, so pointing it at your own
 Gitea or Forgejo instance installs from a mirror. Linux and macOS only; on
-Windows, download `teacli-windows-amd64.exe` from the releases page.
+Windows, download `teacli-windows-amd64.exe` from the releases page, rename it
+to `teacli.exe`, and place it in a directory on your user PATH.
 
 ### With the Go toolchain
 
