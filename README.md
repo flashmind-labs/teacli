@@ -34,7 +34,7 @@ reference and [AGENTS.md](AGENTS.md) for the usage rules.
 
 ## Installation
 
-### Quick install (curl)
+### macOS and Linux
 
 ```bash
 curl -fsSL https://releases.flashmind.com/teacli/install.sh | sh
@@ -55,8 +55,18 @@ Supported variables: `TEACLI_RELEASE_HOST` (default `https://releases.flashmind.
 `TEACLI_RELEASE_REPO` (default `flashmind-labs/teacli`), `TEACLI_VERSION`
 (default `latest`), `TEACLI_INSTALL_DIR` (default `~/.local/bin`). The release
 host is only where binaries are downloaded from, so pointing it at your own
-Gitea or Forgejo instance installs from a mirror. Linux and macOS only; on
-Windows, run `irm https://releases.flashmind.com/teacli/install.ps1 | iex` in PowerShell.
+Gitea or Forgejo instance installs from a mirror.
+
+### Windows
+
+Open PowerShell and run:
+
+```powershell
+irm https://releases.flashmind.com/teacli/install.ps1 | iex
+```
+
+The installer supports Windows x64 and installs to `%USERPROFILE%\.local\bin`.
+Add that directory to your PATH if needed.
 
 ### With the Go toolchain
 
