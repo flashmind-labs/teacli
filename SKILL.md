@@ -34,11 +34,11 @@ instead of assuming. The schema is generated from the binary and is always curre
 
 ```bash
 # Quick install (Linux/macOS)
-curl -fsSL https://raw.githubusercontent.com/flashmind-labs/teacli/main/install.sh | sh
+curl -fsSL https://releases.flashmind.com/teacli/install.sh | sh
 
 # The installer uses ~/.local/bin; add it to PATH if needed.
-# On Windows, download teacli-windows-amd64.exe, rename it to teacli.exe,
-# and place it in a directory on your user PATH.
+# On Windows, run in PowerShell:
+irm https://releases.flashmind.com/teacli/install.ps1 | iex
 
 # Or with the Go toolchain
 go install github.com/rayfish/teacli@latest
@@ -57,9 +57,9 @@ teacli update --force   # reinstall even when already on that version
 ```
 
 The download is checksum-verified against the release's `checksums.txt`, and the
-new binary must run before it replaces the old one. Releases come from GitHub;
+new binary must run before it replaces the old one. Releases come from releases.flashmind.com;
 pass `update --host` and `--repo` to install from a Gitea or Forgejo mirror instead.
-On `update`, the local `--host` selects the release source and defaults to GitHub;
+On `update`, the local `--host` selects the release source and defaults to the release host;
 it overrides the global instance flag. Use `--server` to select credentials for a
 mirror. If teacli lives in a root-owned directory such as `/usr/local/bin`, run it with
 sudo. `--no-verify` skips the checksum check, which you should not need.

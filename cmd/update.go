@@ -27,6 +27,7 @@ import (
 const (
 	defaultReleaseHost = "https://github.com"
 	defaultUpdateRepo  = "flashmind-labs/teacli"
+	defaultReleaseBase = "https://releases.flashmind.com/teacli"
 )
 
 var updateCmd = &cobra.Command{
@@ -55,10 +56,14 @@ type updater struct {
 	repo   string
 	token  string
 	client *http.Client
+	static bool
 }
 
 // releaseBase is the URL prefix release assets are served from.
 func (u *updater) releaseBase(tag string) string {
+	if u.static {
+		return strings.TrimSuffix(u.host, "/") + "/" + url.PathEscape(tag)
+	}
 	return fmt.Sprintf("%s/%s/releases/download/%s", strings.TrimSuffix(u.host, "/"), u.repo, tag)
 }
 
@@ -109,6 +114,17 @@ func isGitHub(host string) bool {
 
 // latestTag resolves the newest published release tag.
 func (u *updater) latestTag() (string, error) {
+	if u.static {
+		data, err := u.get(strings.TrimSuffix(u.host, "/") + "/latest.txt")
+		if err != nil {
+			return "", err
+		}
+		tag := strings.TrimSpace(string(data))
+		if !validReleaseTag(tag) {
+			return "", errors.NewGeneralError("invalid latest release tag")
+		}
+		return tag, nil
+	}
 	endpoint := u.latestEndpoint()
 
 	data, err := u.get(endpoint)
@@ -126,6 +142,19 @@ func (u *updater) latestTag() (string, error) {
 		return "", errors.NewGeneralError(fmt.Sprintf("no release tag found at %s; pass --tag to pin a version", endpoint))
 	}
 	return release.TagName, nil
+}
+
+func validReleaseTag(tag string) bool {
+	parts := strings.Split(strings.TrimPrefix(tag, "v"), ".")
+	if len(parts) != 3 {
+		return false
+	}
+	for _, part := range parts {
+		if part == "" || strings.Trim(part, "0123456789") != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // fetchAsset downloads a release asset and returns its bytes.
@@ -247,6 +276,11 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		token:  token,
 		client: &http.Client{Timeout: 60 * time.Second},
 	}
+	if !cmd.Flags().Changed("host") && !cmd.Flags().Changed("repo") {
+		up.host = defaultReleaseBase
+		up.token = ""
+		up.static = true
+	}
 
 	if tag == "" {
 		latest, err := up.latestTag()
@@ -254,6 +288,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		tag = latest
+	}
+	if up.static && !validReleaseTag(tag) {
+		return errors.NewValidationError("invalid release tag", nil)
 	}
 
 	current := normalizeVersion(cmd.Root().Version)

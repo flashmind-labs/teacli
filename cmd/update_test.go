@@ -256,3 +256,29 @@ func TestDefaultUpdateRepository(t *testing.T) {
 		t.Fatalf("latestEndpoint() = %q, want %q", got, want)
 	}
 }
+
+func TestStaticReleaseSource(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/latest.txt":
+			fmt.Fprintln(w, "v1.0.9")
+		case "/v1.0.9/teacli-linux-amd64":
+			fmt.Fprint(w, "binary")
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	up := &updater{host: srv.URL, static: true, client: srv.Client()}
+	tag, err := up.latestTag()
+	if err != nil || tag != "v1.0.9" {
+		t.Fatalf("latestTag = %q, %v", tag, err)
+	}
+	body, err := up.fetchAsset(tag, "teacli-linux-amd64")
+	if err != nil || string(body) != "binary" {
+		t.Fatalf("fetchAsset = %q, %v", body, err)
+	}
+	if validReleaseTag("../v1.0.9") {
+		t.Fatal("accepted invalid tag")
+	}
+}
