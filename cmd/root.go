@@ -37,7 +37,7 @@ var RootCmd = &cobra.Command{
 Nothing prompts, output is text by default and JSON on request, and every error
 maps onto a documented exit code, so it works the same in a terminal, in a CI
 job, and in the hands of an AI agent.`,
-	Version:       "1.0.9",
+	Version:       "1.0.10",
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
