@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"code.gitea.io/sdk/gitea"
@@ -177,7 +178,7 @@ func runActionWatch(cmd *cobra.Command, args []string) error {
 	started := time.Now()
 	var runID int64
 	for attempt := 0; attempt < 3; attempt++ {
-		runID, err = resolveActionRunID(client, owner, repo, args[1])
+		runID, err = resolveActionRunID(cmd, client, owner, repo, args[1])
 		if err == nil {
 			break
 		}
@@ -282,6 +283,51 @@ type watchRun struct {
 	Name      string     `json:"name"`
 	UpdatedAt *time.Time `json:"updated_at"`
 }
+
+func (r *watchRun) UnmarshalJSON(data []byte) error {
+	type plain watchRun
+	var fields struct {
+		*plain
+		Title       string      `json:"title"`
+		WorkflowID  string      `json:"workflow_id"`
+		Index       int64       `json:"index_in_repo"`
+		PrettyRef   string      `json:"prettyref"`
+		CommitSHA   string      `json:"commit_sha"`
+		TriggerUser *gitea.User `json:"trigger_user"`
+		Started     *time.Time  `json:"started"`
+		Updated     *time.Time  `json:"updated"`
+	}
+	fields.plain = (*plain)(r)
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	if r.RunNumber == 0 {
+		r.RunNumber = fields.Index
+	}
+	if r.Name == "" {
+		r.Name = fields.WorkflowID
+		if r.Name == "" {
+			r.Name = fields.Title
+		}
+	}
+	if r.HeadBranch == "" {
+		r.HeadBranch = strings.TrimPrefix(fields.PrettyRef, "refs/heads/")
+	}
+	if r.HeadSha == "" {
+		r.HeadSha = fields.CommitSHA
+	}
+	if r.Actor == nil {
+		r.Actor = fields.TriggerUser
+	}
+	if r.StartedAt.IsZero() && fields.Started != nil {
+		r.StartedAt = *fields.Started
+	}
+	if r.UpdatedAt == nil {
+		r.UpdatedAt = fields.Updated
+	}
+	return nil
+}
+
 type watchSnapshot struct {
 	run  watchRun
 	jobs []*gitea.ActionWorkflowJob
@@ -372,13 +418,28 @@ func fetchWatchSnapshot(cmd *cobra.Command, owner, repo string, id int64) (watch
 	if err := apiGetInto(cmd, base, &s.run); err != nil {
 		return s, err
 	}
-	s.jobs, err = fetchActionRunJobs(cmd, owner, repo, id, gitea.ListOptions{Page: 1, PageSize: 50}, true)
+	var isArray bool
+	s.jobs, isArray, err = fetchActionRunJobs(cmd, owner, repo, id, gitea.ListOptions{Page: 1, PageSize: 50}, true)
 	if err != nil {
 		if errors.ExitCode(err) == errors.ExitNotFound {
 			s.jobs = nil
 			return s, nil
 		}
 		return s, err
+	}
+	if isArray {
+		for i, job := range s.jobs {
+			path := fmt.Sprintf("repos/%s/%s/actions/jobs/%d", url.PathEscape(owner), url.PathEscape(repo), job.ID)
+			var detail gitea.ActionWorkflowJob
+			if err := apiGetInto(cmd, path, &detail); err != nil {
+				if errors.ExitCode(err) == errors.ExitNotFound {
+					s.jobs = nil
+					return s, nil
+				}
+				return s, err
+			}
+			s.jobs[i] = &detail
+		}
 	}
 	return s, nil
 }

@@ -355,10 +355,7 @@ func TestWatchJSONAPI(t *testing.T) {
 						http.NotFound(w, r)
 						return
 					}
-					if tc.array && r.URL.Query().Get("page") == "2" {
-						fmt.Fprint(w, `[]`)
-						return
-					}
+
 					if poll <= 2 {
 						if tc.array {
 							fmt.Fprint(w, `[]`)
@@ -383,6 +380,18 @@ func TestWatchJSONAPI(t *testing.T) {
 					} else {
 						fmt.Fprintf(w, `{"total_count":1,"jobs":[%s]}`, job)
 					}
+				case "/api/v1/repos/owner/repo/actions/jobs/7":
+					n := 1
+					if poll >= 5 {
+						n = 2
+					}
+					status := "running"
+					conclusion := "null"
+					if poll >= 6 {
+						status = "completed"
+						conclusion = `"success"`
+					}
+					fmt.Fprintf(w, `{"id":7,"name":"build","status":%q,"conclusion":%s,"steps":[{"number":%d,"name":"test","status":"running"}]}`, status, conclusion, n)
 				default:
 					t.Errorf("unexpected path %s", r.URL.Path)
 					http.NotFound(w, r)

@@ -15,6 +15,7 @@ import (
 type actionRunJobsResponse struct {
 	Jobs       []*gitea.ActionWorkflowJob `json:"jobs"`
 	TotalCount *int64                     `json:"total_count"`
+	Array      bool                       `json:"-"`
 }
 
 func (r *actionRunJobsResponse) UnmarshalJSON(data []byte) error {
@@ -30,10 +31,11 @@ func (r *actionRunJobsResponse) UnmarshalJSON(data []byte) error {
 	}
 	r.Jobs = jobs
 	r.TotalCount = nil
+	r.Array = true
 	return nil
 }
 
-func fetchActionRunJobs(cmd *cobra.Command, owner, repo string, id int64, opts gitea.ListOptions, all bool) ([]*gitea.ActionWorkflowJob, error) {
+func fetchActionRunJobs(cmd *cobra.Command, owner, repo string, id int64, opts gitea.ListOptions, all bool) ([]*gitea.ActionWorkflowJob, bool, error) {
 	base := fmt.Sprintf("repos/%s/%s/actions/runs/%d/jobs", url.PathEscape(owner), url.PathEscape(repo), id)
 	if all {
 		opts.Page = 1
@@ -56,17 +58,20 @@ func fetchActionRunJobs(cmd *cobra.Command, owner, repo string, id int64, opts g
 		}
 		data, err := apiRequest(cmd, http.MethodGet, path, nil)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		var result actionRunJobsResponse
 		if err := json.Unmarshal(data, &result); err != nil {
-			return nil, errors.NewGeneralError(fmt.Sprintf("failed to decode response: %v", err))
+			return nil, false, errors.NewGeneralError(fmt.Sprintf("failed to decode response: %v", err))
 		}
 		jobs = append(jobs, result.Jobs...)
+		if result.Array {
+			return jobs, true, nil
+		}
 		if !all || len(result.Jobs) == 0 || (result.TotalCount != nil && int64(len(jobs)) >= *result.TotalCount) {
-			return jobs, nil
+			return jobs, false, nil
 		}
 		opts.Page++
 	}
-	return nil, errors.NewGeneralError("too many pages of workflow jobs")
+	return nil, false, errors.NewGeneralError("too many pages of workflow jobs")
 }

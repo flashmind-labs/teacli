@@ -100,11 +100,6 @@ func runActionList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	client, err := getClient(cmd)
-	if err != nil {
-		return err
-	}
-
 	page, _ := cmd.Flags().GetInt("page")
 	perPage, _ := cmd.Flags().GetInt("per-page")
 	status, _ := cmd.Flags().GetString("status")
@@ -144,15 +139,7 @@ func runActionList(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	workflowRuns, err := fetchList(cmd, func(lo gitea.ListOptions) ([]*gitea.ActionWorkflowRun, *gitea.Response, error) {
-		pageOpts := opts
-		pageOpts.ListOptions = lo
-		res, resp, err := client.ListRepoActionRuns(owner, repo, pageOpts)
-		if err != nil {
-			return nil, resp, err
-		}
-		return res.WorkflowRuns, resp, nil
-	})
+	workflowRuns, err := fetchActionRuns(cmd, owner, repo, opts, fetchAll)
 	if err != nil {
 		return err
 	}
@@ -200,7 +187,7 @@ func runActionList(cmd *cobra.Command, args []string) error {
 // the database ID first; on a 404 it walks the run list (newest-first) looking
 // for a matching run_number. The input string is echoed in any not-found error
 // so the caller's message reflects what the user typed.
-func resolveActionRunID(client *gitea.Client, owner, repo, input string) (int64, error) {
+func resolveActionRunID(cmd *cobra.Command, client *gitea.Client, owner, repo, input string) (int64, error) {
 	id, err := strconv.ParseInt(input, 10, 64)
 	if err != nil {
 		return 0, errors.NewValidationError("invalid run ID",
@@ -220,13 +207,14 @@ func resolveActionRunID(client *gitea.Client, owner, repo, input string) (int64,
 	const pageSize = 50
 	page := 1
 	for {
-		runs, resp, err := client.ListRepoActionRuns(owner, repo, gitea.ListRepoActionRunsOptions{
-			ListOptions: gitea.ListOptions{Page: page, PageSize: pageSize},
-		})
-		if err != nil {
-			return 0, errors.FromGitea(resp, err)
+		var result struct {
+			WorkflowRuns []watchRun `json:"workflow_runs"`
 		}
-		list := runs.WorkflowRuns
+		path := fmt.Sprintf("repos/%s/%s/actions/runs?limit=%d&page=%d", url.PathEscape(owner), url.PathEscape(repo), pageSize, page)
+		if err := apiGetInto(cmd, path, &result); err != nil {
+			return 0, err
+		}
+		list := result.WorkflowRuns
 		if len(list) == 0 {
 			break
 		}
@@ -264,7 +252,7 @@ func runActionGet(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	runID, err := resolveActionRunID(client, owner, repo, args[1])
+	runID, err := resolveActionRunID(cmd, client, owner, repo, args[1])
 	if err != nil {
 		return err
 	}
@@ -370,7 +358,7 @@ func runActionDelete(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	runID, err := resolveActionRunID(client, owner, repo, args[1])
+	runID, err := resolveActionRunID(cmd, client, owner, repo, args[1])
 	if err != nil {
 		return err
 	}
@@ -405,12 +393,12 @@ func runActionJobs(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	runID, err := resolveActionRunID(client, owner, repo, args[1])
+	runID, err := resolveActionRunID(cmd, client, owner, repo, args[1])
 	if err != nil {
 		return err
 	}
 
-	jobs, err := fetchActionRunJobs(cmd, owner, repo, runID, listOptions(cmd), fetchAll)
+	jobs, _, err := fetchActionRunJobs(cmd, owner, repo, runID, listOptions(cmd), fetchAll)
 	if err != nil {
 		return err
 	}
