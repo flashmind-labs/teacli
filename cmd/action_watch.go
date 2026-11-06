@@ -2,7 +2,10 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/url"
 	"time"
 
 	"code.gitea.io/sdk/gitea"
@@ -72,6 +75,7 @@ type runWatcher struct {
 	now      func() time.Time
 	sleep    func(time.Duration)
 	onChange func(status string)
+	onRun    func(*gitea.ActionWorkflowRun) error
 }
 
 // wait returns the run once it stops running, or an error if it never does
@@ -79,30 +83,42 @@ type runWatcher struct {
 func (w runWatcher) wait() (*gitea.ActionWorkflowRun, error) {
 	deadline := w.now().Add(w.timeout)
 	previous := ""
+	failures := 0
 
 	for {
 		run, err := w.fetch()
-		if err != nil {
-			return nil, err
-		}
-
-		if run.Status != previous {
-			previous = run.Status
-			if w.onChange != nil {
-				w.onChange(run.Status)
-			}
-		}
-
-		if !runInFlight(run.Status) {
-			return run, nil
-		}
-
 		wait := w.interval
+		if err != nil {
+			failures++
+			if failures >= 3 {
+				return nil, &errors.CLIError{Code: 6, Message: fmt.Sprintf("API error after 3 attempts: %v", err)}
+			}
+			wait *= time.Duration(1 << (failures - 1))
+		} else {
+			failures = 0
+			if w.onRun != nil {
+				if err := w.onRun(run); err != nil {
+					return nil, err
+				}
+			}
+
+			if run.Status != previous {
+				previous = run.Status
+				if w.onChange != nil {
+					w.onChange(run.Status)
+				}
+			}
+
+			if !runInFlight(run.Status) {
+				return run, nil
+			}
+
+		}
 		if w.timeout > 0 {
 			left := deadline.Sub(w.now())
 			if left <= 0 {
-				return nil, errors.NewGeneralError(fmt.Sprintf(
-					"timed out after %s waiting for the workflow run to finish", w.timeout))
+				return nil, &errors.CLIError{Code: 5, Message: fmt.Sprintf(
+					"timed out after %s waiting for the workflow run to finish", w.timeout)}
 			}
 			// Trim the last wait so the run is polled once at the deadline
 			// rather than skipped past it.
@@ -158,13 +174,51 @@ func runActionWatch(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	runID, err := resolveActionRunID(client, owner, repo, args[1])
-	if err != nil {
-		return err
+	started := time.Now()
+	var runID int64
+	for attempt := 0; attempt < 3; attempt++ {
+		runID, err = resolveActionRunID(client, owner, repo, args[1])
+		if err == nil {
+			break
+		}
+		if errors.ExitCode(err) != errors.ExitGeneralError {
+			return err
+		}
+		if attempt == 2 {
+			return &errors.CLIError{Code: 6, Message: fmt.Sprintf("API error after 3 attempts: %v", err)}
+		}
+		delay := interval * time.Duration(1<<attempt)
+		if timeout > 0 {
+			left := timeout - time.Since(started)
+			if left <= 0 {
+				return &errors.CLIError{Code: 5, Message: fmt.Sprintf("timed out after %s waiting for the workflow run to finish", timeout)}
+			}
+			if delay > left {
+				delay = left
+			}
+		}
+		time.Sleep(delay)
 	}
 
+	remaining := timeout
+	if timeout > 0 {
+		remaining = timeout - time.Since(started)
+		if remaining <= 0 {
+			return &errors.CLIError{Code: 5, Message: fmt.Sprintf("timed out after %s waiting for the workflow run to finish", timeout)}
+		}
+	}
+	var snapshot watchSnapshot
+	var previous []byte
 	watcher := runWatcher{
 		fetch: func() (*gitea.ActionWorkflowRun, error) {
+			if printer.Format() == output.FormatJSON {
+				var err error
+				snapshot, err = fetchWatchSnapshot(cmd, owner, repo, runID)
+				if err != nil {
+					return nil, err
+				}
+				return &snapshot.run.ActionWorkflowRun, nil
+			}
 			run, resp, err := client.GetRepoActionRun(owner, repo, runID)
 			if err != nil {
 				return nil, errors.FromGiteaNotFound(resp, err, "workflow run", args[1])
@@ -172,9 +226,29 @@ func runActionWatch(cmd *cobra.Command, args []string) error {
 			return run, nil
 		},
 		interval: interval,
-		timeout:  timeout,
+		timeout:  remaining,
 		now:      time.Now,
 		sleep:    time.Sleep,
+	}
+
+	if printer.Format() == output.FormatJSON {
+		watcher.onRun = func(run *gitea.ActionWorkflowRun) error {
+			state, err := json.Marshal(snapshot)
+			if err != nil {
+				return err
+			}
+			if !bytes.Equal(previous, state) {
+				line, err := json.Marshal(snapshot.output())
+				if err != nil {
+					return err
+				}
+				if _, err = fmt.Fprintln(cmd.OutOrStdout(), string(line)); err != nil {
+					return err
+				}
+				previous = state
+			}
+			return nil
+		}
 	}
 
 	// Progress goes to stderr, and only on a status change, so stdout stays a
@@ -190,6 +264,9 @@ func runActionWatch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if printer.Format() == output.FormatJSON {
+		return watchOutcomeError(finished, args[1])
+	}
 	if err := printer.Emit(finished, func() error {
 		return printActionRunText(printer, finished)
 	}); err != nil {
@@ -197,4 +274,118 @@ func runActionWatch(cmd *cobra.Command, args []string) error {
 	}
 
 	return watchOutcomeError(finished, args[1])
+}
+
+// watchRun retains fields missing from the SDK's run type.
+type watchRun struct {
+	gitea.ActionWorkflowRun
+	Name      string     `json:"name"`
+	UpdatedAt *time.Time `json:"updated_at"`
+}
+type watchSnapshot struct {
+	run  watchRun
+	jobs []*gitea.ActionWorkflowJob
+}
+
+// MarshalJSON includes the full API state for change detection.
+func (s watchSnapshot) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Run  watchRun                   `json:"run"`
+		Jobs []*gitea.ActionWorkflowJob `json:"jobs"`
+	}{s.run, s.jobs})
+}
+
+type watchStep struct {
+	Number int64  `json:"number"`
+	Total  int    `json:"total"`
+	Name   string `json:"name"`
+}
+type watchJob struct {
+	ID          int64      `json:"id"`
+	Name        string     `json:"name"`
+	Status      string     `json:"status"`
+	Conclusion  *string    `json:"conclusion"`
+	StartedAt   *time.Time `json:"started_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+	Step        *watchStep `json:"step"`
+}
+type watchOutput struct {
+	RunID      int64      `json:"run_id"`
+	Status     string     `json:"status"`
+	Conclusion *string    `json:"conclusion"`
+	Workflow   string     `json:"workflow"`
+	Branch     string     `json:"branch"`
+	Event      string     `json:"event"`
+	Actor      string     `json:"actor"`
+	URL        string     `json:"url"`
+	StartedAt  *time.Time `json:"started_at"`
+	UpdatedAt  *time.Time `json:"updated_at"`
+	Jobs       []watchJob `json:"jobs"`
+}
+
+func optionalString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+func optionalTime(t time.Time) *time.Time {
+	if t.IsZero() {
+		return nil
+	}
+	return &t
+}
+func (s watchSnapshot) output() watchOutput {
+	r := s.run
+	actor := ""
+	if r.Actor != nil {
+		actor = r.Actor.UserName
+	}
+	workflow := r.Name
+	if workflow == "" {
+		workflow = r.DisplayTitle
+	}
+	if workflow == "" {
+		workflow = r.Path
+	}
+	link := r.HTMLURL
+	if link == "" {
+		link = r.URL
+	}
+	out := watchOutput{r.ID, r.Status, optionalString(r.Conclusion), workflow, r.HeadBranch, r.Event, actor, link, optionalTime(r.StartedAt), r.UpdatedAt, make([]watchJob, 0, len(s.jobs))}
+	for _, j := range s.jobs {
+		job := watchJob{j.ID, j.Name, j.Status, optionalString(j.Conclusion), optionalTime(j.StartedAt), optionalTime(j.CompletedAt), nil}
+		for _, step := range j.Steps {
+			if step != nil && (step.Status == "running" || step.Status == "in_progress") {
+				job.Step = &watchStep{step.Number, len(j.Steps), step.Name}
+				break
+			}
+		}
+		out.Jobs = append(out.Jobs, job)
+	}
+	return out
+}
+func fetchWatchSnapshot(cmd *cobra.Command, owner, repo string, id int64) (watchSnapshot, error) {
+	var s watchSnapshot
+	base := fmt.Sprintf("repos/%s/%s/actions/runs/%d", url.PathEscape(owner), url.PathEscape(repo), id)
+	if err := apiGetInto(cmd, base, &s.run); err != nil {
+		return s, err
+	}
+	s.jobs = make([]*gitea.ActionWorkflowJob, 0)
+	for page := 1; ; page++ {
+		var result gitea.ActionWorkflowJobsResponse
+		err := apiGetInto(cmd, fmt.Sprintf("%s/jobs?limit=50&page=%d", base, page), &result)
+		if err != nil {
+			if errors.ExitCode(err) == errors.ExitNotFound {
+				s.jobs = nil
+				return s, nil
+			}
+			return s, err
+		}
+		s.jobs = append(s.jobs, result.Jobs...)
+		if len(result.Jobs) == 0 || int64(len(s.jobs)) >= result.TotalCount {
+			break
+		}
+	}
+	return s, nil
 }

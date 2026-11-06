@@ -795,13 +795,18 @@ teacli action run <owner>/<repo> --workflow <file> [--ref <branch-or-tag>] [--in
 teacli action watch <owner>/<repo> <run-id> [--interval 5s] [--timeout 30m]
 ```
 
-`action watch` polls the run until it stops, then prints it exactly like
-`action get`. It exits `0` only when the run concludes `success`; any other
-conclusion (`failure`, `cancelled`, `skipped`) and a reached `--timeout` exit
-`1`, so `teacli action watch 107 && teacli release create v1.0.0` does what it
-looks like. `--timeout 0` waits indefinitely. Status changes are reported on
-stderr, one line per change, and are suppressed under `--format json` so stdout
-stays a single object.
+`action watch` polls until the run finishes. Text output reports status changes
+on stderr and prints the final run on stdout. JSON output is newline-delimited:
+one snapshot per change, including jobs and the active step, and a final snapshot.
+Servers without the jobs endpoint return an empty `jobs` array.
+
+```bash
+teacli action watch owner/repo 42 --format json | jq --unbuffered '.jobs'
+```
+
+It exits `0` on success, `1` for any other conclusion, `5` on timeout, and
+`6` after three consecutive API errors. Failed API calls are retried with
+backoff. `--timeout 0` waits indefinitely; the default interval is 5 seconds.
 
 `action get`, `action watch`, `action jobs`, and `action delete` accept either
 the run's **run number** (the short number shown in the Gitea web UI URL, e.g.
@@ -900,6 +905,8 @@ teacli schema --format json | jq '.commands[] | select(.path == "pr merge") | .f
 | `2` | Validation error (missing arguments, invalid values) |
 | `3` | Resource not found |
 | `4` | Permission denied |
+| `5` | Action watch timeout |
+| `6` | Action watch API error after retries |
 
 Errors go to stderr and follow `--format`. Plain text by default:
 

@@ -1,7 +1,14 @@
 package cmd
 
 import (
-	stderrors "errors"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"github.com/spf13/cobra"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -121,8 +128,8 @@ func TestWatchRunTimesOut(t *testing.T) {
 	if err == nil {
 		t.Fatal("wait returned no error, want a timeout")
 	}
-	if errors.ExitCode(err) != errors.ExitGeneralError {
-		t.Errorf("exit code = %d, want %d", errors.ExitCode(err), errors.ExitGeneralError)
+	if errors.ExitCode(err) != 5 {
+		t.Errorf("exit code = %d, want 5", errors.ExitCode(err))
 	}
 	if !strings.Contains(err.Error(), "timed out") {
 		t.Errorf("error = %q, want it to mention the timeout", err.Error())
@@ -166,8 +173,8 @@ func TestWatchRunPropagatesAFetchError(t *testing.T) {
 	}
 
 	_, err := watcher.wait()
-	if !stderrors.Is(err, error(wanted)) {
-		t.Errorf("error = %v, want the fetch error unchanged", err)
+	if errors.ExitCode(err) != 6 || !strings.Contains(err.Error(), wanted.Error()) {
+		t.Errorf("error = %v, want API error", err)
 	}
 }
 
@@ -306,5 +313,120 @@ func TestWatchRunPollsOnceMoreAtTheDeadline(t *testing.T) {
 		if clock.slept[i] != d {
 			t.Errorf("sleep %d = %v, want %v", i, clock.slept[i], d)
 		}
+	}
+}
+
+func TestWatchJSONAPI(t *testing.T) {
+	for _, tc := range []struct {
+		name                        string
+		missing, transient, failure bool
+	}{
+		{name: "progress"}, {name: "failure", failure: true}, {name: "old server", missing: true}, {name: "transient", transient: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			poll := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/api/v1/version":
+					fmt.Fprint(w, `{"version":"1.25.0"}`)
+				case "/api/v1/repos/owner/repo/actions/runs/42":
+					if poll > 0 && tc.transient && poll == 2 {
+						poll++
+						http.Error(w, "temporary", 500)
+						return
+					}
+					state := "queued"
+					conclusion := "null"
+					if poll >= 2 {
+						state = "running"
+					}
+					if poll >= 5 {
+						state = "completed"
+						conclusion = `"success"`
+						if tc.failure {
+							conclusion = `"failure"`
+						}
+					}
+					fmt.Fprintf(w, `{"id":42,"status":%q,"conclusion":%s,"name":"CI","head_branch":"main","event":"push","actor":{"login":"user"},"html_url":"https://example.com/run","started_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z"}`, state, conclusion)
+					poll++
+				case "/api/v1/repos/owner/repo/actions/runs/42/jobs":
+					if tc.missing {
+						http.NotFound(w, r)
+						return
+					}
+					if poll <= 2 {
+						fmt.Fprint(w, `{"total_count":0,"jobs":[]}`)
+						return
+					}
+					n := 1
+					if poll >= 5 {
+						n = 2
+					}
+					status := "running"
+					conclusion := "null"
+					if poll >= 6 {
+						status = "completed"
+						conclusion = `"success"`
+					}
+					fmt.Fprintf(w, `{"total_count":1,"jobs":[{"id":7,"name":"build","status":%q,"conclusion":%s,"steps":[{"number":%d,"name":"test","status":"running"}]}]}`, status, conclusion, n)
+				default:
+					t.Errorf("unexpected path %s", r.URL.Path)
+					http.NotFound(w, r)
+				}
+			}))
+			defer srv.Close()
+			oldConfig, oldServer := configPath, serverName
+			configPath = filepath.Join(t.TempDir(), "config")
+			serverName = "example"
+			defer func() { configPath, serverName = oldConfig, oldServer }()
+			if err := os.WriteFile(configPath, []byte("[example]\nurl = "+srv.URL+"\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			cmd := &cobra.Command{}
+			cmd.Flags().Bool("dry-run", false, "")
+			cmd.Flags().String("format", "json", "")
+			cmd.Flags().Duration("interval", time.Microsecond, "")
+			cmd.Flags().Duration("timeout", time.Second, "")
+			var out bytes.Buffer
+			cmd.SetOut(&out)
+			err := runActionWatch(cmd, []string{"owner/repo", "42"})
+			wantCode := 0
+			if tc.failure {
+				wantCode = 1
+			}
+			if errors.ExitCode(err) != wantCode {
+				t.Fatalf("error %v", err)
+			}
+			if tc.name == "progress" {
+				want := `{"run_id":42,"status":"queued","conclusion":null,"workflow":"CI","branch":"main","event":"push","actor":"user","url":"https://example.com/run","started_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","jobs":[]}
+{"run_id":42,"status":"running","conclusion":null,"workflow":"CI","branch":"main","event":"push","actor":"user","url":"https://example.com/run","started_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","jobs":[{"id":7,"name":"build","status":"running","conclusion":null,"started_at":null,"completed_at":null,"step":{"number":1,"total":1,"name":"test"}}]}
+{"run_id":42,"status":"running","conclusion":null,"workflow":"CI","branch":"main","event":"push","actor":"user","url":"https://example.com/run","started_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","jobs":[{"id":7,"name":"build","status":"running","conclusion":null,"started_at":null,"completed_at":null,"step":{"number":2,"total":1,"name":"test"}}]}
+{"run_id":42,"status":"completed","conclusion":"success","workflow":"CI","branch":"main","event":"push","actor":"user","url":"https://example.com/run","started_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","jobs":[{"id":7,"name":"build","status":"completed","conclusion":"success","started_at":null,"completed_at":null,"step":{"number":2,"total":1,"name":"test"}}]}
+`
+				if out.String() != want {
+					t.Fatalf("output:\n%s\nwant:\n%s", out.String(), want)
+				}
+			}
+			lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+			if len(lines) < 2 {
+				t.Fatalf("lines: %q", out.String())
+			}
+			for _, line := range lines {
+				var obj map[string]any
+				if err := json.Unmarshal([]byte(line), &obj); err != nil {
+					t.Fatal(err)
+				}
+				if _, ok := obj["jobs"].([]any); !ok {
+					t.Fatalf("jobs: %s", line)
+				}
+			}
+			if !strings.Contains(lines[len(lines)-1], `"status":"completed"`) {
+				t.Fatal(out.String())
+			}
+			if !tc.missing && !strings.Contains(out.String(), `"number":2`) {
+				t.Fatal(out.String())
+			}
+		})
 	}
 }
