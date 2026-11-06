@@ -798,7 +798,8 @@ teacli action watch <owner>/<repo> <run-id> [--interval 5s] [--timeout 30m]
 `action watch` polls until the run finishes. Text output reports status changes
 on stderr and prints the final run on stdout. JSON output is newline-delimited:
 one snapshot per change, including jobs and the active step, and a final snapshot.
-Servers without the jobs endpoint return an empty `jobs` array.
+Servers without the jobs endpoint return an empty `jobs` array. `action jobs`
+and `action watch` accept both Forgejo array and Gitea object job responses.
 
 ```bash
 teacli action watch owner/repo 42 --format json | jq --unbuffered '.jobs'

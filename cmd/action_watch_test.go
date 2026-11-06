@@ -318,10 +318,10 @@ func TestWatchRunPollsOnceMoreAtTheDeadline(t *testing.T) {
 
 func TestWatchJSONAPI(t *testing.T) {
 	for _, tc := range []struct {
-		name                        string
-		missing, transient, failure bool
+		name                               string
+		missing, transient, failure, array bool
 	}{
-		{name: "progress"}, {name: "failure", failure: true}, {name: "old server", missing: true}, {name: "transient", transient: true},
+		{name: "progress"}, {name: "array", array: true}, {name: "failure", failure: true}, {name: "old server", missing: true}, {name: "transient", transient: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			poll := 0
@@ -355,7 +355,15 @@ func TestWatchJSONAPI(t *testing.T) {
 						http.NotFound(w, r)
 						return
 					}
+					if tc.array && r.URL.Query().Get("page") == "2" {
+						fmt.Fprint(w, `[]`)
+						return
+					}
 					if poll <= 2 {
+						if tc.array {
+							fmt.Fprint(w, `[]`)
+							return
+						}
 						fmt.Fprint(w, `{"total_count":0,"jobs":[]}`)
 						return
 					}
@@ -369,7 +377,12 @@ func TestWatchJSONAPI(t *testing.T) {
 						status = "completed"
 						conclusion = `"success"`
 					}
-					fmt.Fprintf(w, `{"total_count":1,"jobs":[{"id":7,"name":"build","status":%q,"conclusion":%s,"steps":[{"number":%d,"name":"test","status":"running"}]}]}`, status, conclusion, n)
+					job := fmt.Sprintf(`{"id":7,"name":"build","status":%q,"conclusion":%s,"steps":[{"number":%d,"name":"test","status":"running"}]}`, status, conclusion, n)
+					if tc.array {
+						fmt.Fprintf(w, `[%s]`, job)
+					} else {
+						fmt.Fprintf(w, `{"total_count":1,"jobs":[%s]}`, job)
+					}
 				default:
 					t.Errorf("unexpected path %s", r.URL.Path)
 					http.NotFound(w, r)
@@ -398,7 +411,7 @@ func TestWatchJSONAPI(t *testing.T) {
 			if errors.ExitCode(err) != wantCode {
 				t.Fatalf("error %v", err)
 			}
-			if tc.name == "progress" {
+			if tc.name == "progress" || tc.array {
 				want := `{"run_id":42,"status":"queued","conclusion":null,"workflow":"CI","branch":"main","event":"push","actor":"user","url":"https://example.com/run","started_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","jobs":[]}
 {"run_id":42,"status":"running","conclusion":null,"workflow":"CI","branch":"main","event":"push","actor":"user","url":"https://example.com/run","started_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","jobs":[{"id":7,"name":"build","status":"running","conclusion":null,"started_at":null,"completed_at":null,"step":{"number":1,"total":1,"name":"test"}}]}
 {"run_id":42,"status":"running","conclusion":null,"workflow":"CI","branch":"main","event":"push","actor":"user","url":"https://example.com/run","started_at":"2024-01-01T00:00:00Z","updated_at":"2024-01-01T00:00:00Z","jobs":[{"id":7,"name":"build","status":"running","conclusion":null,"started_at":null,"completed_at":null,"step":{"number":2,"total":1,"name":"test"}}]}

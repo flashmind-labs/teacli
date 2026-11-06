@@ -398,16 +398,6 @@ func runActionJobs(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	page, _ := cmd.Flags().GetInt("page")
-	perPage, _ := cmd.Flags().GetInt("per-page")
-
-	opts := gitea.ListRepoActionJobsOptions{
-		ListOptions: gitea.ListOptions{
-			Page:     page,
-			PageSize: perPage,
-		},
-	}
-
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
 	if dryRun {
 		printer := getPrinter(cmd)
@@ -420,15 +410,7 @@ func runActionJobs(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	jobs, err := fetchList(cmd, func(lo gitea.ListOptions) ([]*gitea.ActionWorkflowJob, *gitea.Response, error) {
-		pageOpts := opts
-		pageOpts.ListOptions = lo
-		res, resp, err := client.ListRepoActionRunJobs(owner, repo, runID, pageOpts)
-		if err != nil {
-			return nil, resp, errors.FromGiteaNotFound(resp, err, "workflow run", args[1])
-		}
-		return res.Jobs, resp, nil
-	})
+	jobs, err := fetchActionRunJobs(cmd, owner, repo, runID, listOptions(cmd), fetchAll)
 	if err != nil {
 		return err
 	}

@@ -367,25 +367,18 @@ func (s watchSnapshot) output() watchOutput {
 }
 func fetchWatchSnapshot(cmd *cobra.Command, owner, repo string, id int64) (watchSnapshot, error) {
 	var s watchSnapshot
+	var err error
 	base := fmt.Sprintf("repos/%s/%s/actions/runs/%d", url.PathEscape(owner), url.PathEscape(repo), id)
 	if err := apiGetInto(cmd, base, &s.run); err != nil {
 		return s, err
 	}
-	s.jobs = make([]*gitea.ActionWorkflowJob, 0)
-	for page := 1; ; page++ {
-		var result gitea.ActionWorkflowJobsResponse
-		err := apiGetInto(cmd, fmt.Sprintf("%s/jobs?limit=50&page=%d", base, page), &result)
-		if err != nil {
-			if errors.ExitCode(err) == errors.ExitNotFound {
-				s.jobs = nil
-				return s, nil
-			}
-			return s, err
+	s.jobs, err = fetchActionRunJobs(cmd, owner, repo, id, gitea.ListOptions{Page: 1, PageSize: 50}, true)
+	if err != nil {
+		if errors.ExitCode(err) == errors.ExitNotFound {
+			s.jobs = nil
+			return s, nil
 		}
-		s.jobs = append(s.jobs, result.Jobs...)
-		if len(result.Jobs) == 0 || int64(len(s.jobs)) >= result.TotalCount {
-			break
-		}
+		return s, err
 	}
 	return s, nil
 }
