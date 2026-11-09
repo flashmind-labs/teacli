@@ -45,6 +45,7 @@ func apiDo(cmd *cobra.Command, method, path string, body io.Reader, headers map[
 	}
 
 	client := *http.DefaultClient
+	client.Timeout = serverTimeout(server)
 	client.CheckRedirect = func(next *http.Request, via []*http.Request) error {
 		if !sameOrigin(origin, next.URL) {
 			next.Header.Del("Authorization")

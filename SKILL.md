@@ -107,6 +107,8 @@ teacli auth config unset <server>
 teacli auth logout [server-name]
 ```
 
+API requests time out after 30 seconds by default. Set a server's `timeout` to a positive number of seconds to override it.
+
 Servers live in `~/.config/teacli/teacli.ini`. `--config <path>` points every
 command, `auth login` included, at a different file, and creates its directory
 if it does not exist yet. Use it to keep a CI or per-project config out of the

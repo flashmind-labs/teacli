@@ -4,9 +4,11 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	"code.gitea.io/sdk/gitea"
 	"github.com/rayfish/teacli/modules/config"
@@ -37,7 +39,7 @@ var RootCmd = &cobra.Command{
 Nothing prompts, output is text by default and JSON on request, and every error
 maps onto a documented exit code, so it works the same in a terminal, in a CI
 job, and in the hands of an AI agent.`,
-	Version:       "1.0.13",
+	Version:       "1.0.14",
 	SilenceErrors: true,
 	SilenceUsage:  true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -160,12 +162,21 @@ func getClient(cmd *cobra.Command) (*gitea.Client, error) {
 		return nil, err
 	}
 
-	client, err := gitea.NewClient(server.URL, gitea.SetToken(server.Token))
+	client, err := gitea.NewClient(server.URL, gitea.SetToken(server.Token),
+		gitea.SetHTTPClient(&http.Client{Timeout: serverTimeout(server)}))
 	if err != nil {
 		return nil, errors.NewGeneralError(fmt.Sprintf("failed to create client: %v", err))
 	}
 
 	return client, nil
+}
+
+// serverTimeout applies the default to unset or non-positive server timeouts.
+func serverTimeout(server *config.ServerConfig) time.Duration {
+	if server.Timeout > 0 {
+		return time.Duration(server.Timeout) * time.Second
+	}
+	return 30 * time.Second
 }
 
 // ResolvedFormat reports the output format after flag parsing, using the same
