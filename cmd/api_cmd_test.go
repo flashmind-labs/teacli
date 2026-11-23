@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/rayfish/teacli/modules/errors"
+	"github.com/flashmind-labs/teacli/modules/errors"
 )
 
 func TestAPIURL(t *testing.T) {

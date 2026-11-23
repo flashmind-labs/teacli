@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/rayfish/teacli/cmd"
-	"github.com/rayfish/teacli/modules/errors"
+	"github.com/flashmind-labs/teacli/cmd"
+	"github.com/flashmind-labs/teacli/modules/errors"
 )
 
 func main() {

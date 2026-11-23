@@ -2,7 +2,7 @@
 package cmd
 
 import (
-	"github.com/rayfish/teacli/modules/errors"
+	"github.com/flashmind-labs/teacli/modules/errors"
 
 	"github.com/spf13/cobra"
 )

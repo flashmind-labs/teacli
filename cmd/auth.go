@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rayfish/teacli/modules/config"
-	"github.com/rayfish/teacli/modules/errors"
+	"github.com/flashmind-labs/teacli/modules/config"
+	"github.com/flashmind-labs/teacli/modules/errors"
 
 	"github.com/spf13/cobra"
 )

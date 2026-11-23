@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"code.gitea.io/sdk/gitea"
-	"github.com/rayfish/teacli/modules/errors"
+	"github.com/flashmind-labs/teacli/modules/errors"
 )
 
 // fakeClock advances only when the watcher sleeps, so tests cover long waits

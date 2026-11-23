@@ -41,7 +41,7 @@ curl -fsSL https://releases.flashmind.com/teacli/install.sh | sh
 irm https://releases.flashmind.com/teacli/install.ps1 | iex
 
 # Or with the Go toolchain
-go install github.com/rayfish/teacli@latest
+go install github.com/flashmind-labs/teacli@latest
 
 # Or build and install locally (defaults to ~/.local/bin)
 just install
@@ -152,7 +152,7 @@ repository the matching remote points at.
 
 ```bash
 cd ~/work/teacli
-teacli issue list                 # rayfish/teacli
+teacli issue list                 # flashmind-labs/teacli
 teacli action get 16057           # the run id shifts into first place
 teacli pr merge 42 --method squash
 

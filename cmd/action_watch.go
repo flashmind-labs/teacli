@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"code.gitea.io/sdk/gitea"
-	"github.com/rayfish/teacli/modules/errors"
-	"github.com/rayfish/teacli/modules/output"
+	"github.com/flashmind-labs/teacli/modules/errors"
+	"github.com/flashmind-labs/teacli/modules/output"
 
 	"github.com/spf13/cobra"
 )

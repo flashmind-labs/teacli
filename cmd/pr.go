@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"code.gitea.io/sdk/gitea"
-	"github.com/rayfish/teacli/internal/utils"
-	"github.com/rayfish/teacli/modules/errors"
+	"github.com/flashmind-labs/teacli/internal/utils"
+	"github.com/flashmind-labs/teacli/modules/errors"
 
 	"github.com/spf13/cobra"
 )
