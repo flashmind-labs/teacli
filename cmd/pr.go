@@ -134,8 +134,8 @@ func init() {
 	prMergeCmd.Flags().StringP("method", "m", "merge", "Merge method: merge, rebase, rebase-merge, squash")
 	prMergeCmd.Flags().Bool("delete-branch", false, "Delete the head branch after merging")
 
-	prCommentsCmd.Flags().Int("page", 0, "Page number")
-	prCommentsCmd.Flags().Int("per-page", 0, "Results per page")
+	prCommentsCmd.Flags().Int("page", 0, "Accepted for compatibility (comments are unpaginated)")
+	prCommentsCmd.Flags().Int("per-page", 0, "Accepted for compatibility (comments are unpaginated)")
 
 	prReviewsCmd.Flags().Int("page", 0, "Page number")
 	prReviewsCmd.Flags().Int("per-page", 0, "Results per page")
@@ -458,9 +458,7 @@ func runPRComments(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	comments, err := fetchList(cmd, func(lo gitea.ListOptions) ([]*gitea.Comment, *gitea.Response, error) {
-		return client.ListIssueComments(owner, repo, prNum, gitea.ListIssueCommentOptions{ListOptions: lo})
-	})
+	comments, err := listIssueComments(client, owner, repo, prNum)
 	if err != nil {
 		return err
 	}

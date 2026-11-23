@@ -156,8 +156,8 @@ func init() {
 	issueCommentCreateCmd.Flags().StringP("body", "b", "", "Comment body (required)")
 	issueCommentCreateCmd.MarkFlagRequired("body")
 
-	issueCommentListCmd.Flags().Int("page", 0, "Page number")
-	issueCommentListCmd.Flags().Int("per-page", 0, "Results per page")
+	issueCommentListCmd.Flags().Int("page", 0, "Accepted for compatibility (comments are unpaginated)")
+	issueCommentListCmd.Flags().Int("per-page", 0, "Accepted for compatibility (comments are unpaginated)")
 }
 
 func runIssueList(cmd *cobra.Command, args []string) error {
@@ -380,9 +380,7 @@ func runIssueCommentList(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	comments, err := fetchList(cmd, func(lo gitea.ListOptions) ([]*gitea.Comment, *gitea.Response, error) {
-		return client.ListIssueComments(owner, repo, issueNum, gitea.ListIssueCommentOptions{ListOptions: lo})
-	})
+	comments, err := listIssueComments(client, owner, repo, issueNum)
 	if err != nil {
 		return err
 	}
@@ -404,6 +402,15 @@ func runIssueCommentList(cmd *cobra.Command, args []string) error {
 	return printer.Emit(comments, func() error {
 		return printer.PrintTable(headers, rows)
 	})
+}
+
+func listIssueComments(client *gitea.Client, owner, repo string, index int64) ([]*gitea.Comment, error) {
+	// The per-issue comments endpoint returns the full list in one response.
+	comments, resp, err := client.ListIssueComments(owner, repo, index, gitea.ListIssueCommentOptions{})
+	if err != nil {
+		return nil, errors.FromGitea(resp, err)
+	}
+	return comments, nil
 }
 
 func runIssueCommentCreate(cmd *cobra.Command, args []string) error {

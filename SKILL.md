@@ -961,8 +961,8 @@ The binary reads these variables:
 
 ## Pagination
 
-List commands return the server's first page (30 items) by default. That is a
-silent truncation: nothing in the output says more exists. Pass `--all` when you
+Paginated list commands return the server's first page (30 items) by default.
+The output gives no indication that more items exist. Pass `--all` when you
 need the complete set.
 
 ```bash
@@ -975,6 +975,9 @@ teacli api user/repos --paginate
 `--page` and `--per-page` select a single specific page instead. `--per-page` is
 capped by the server's MAX_RESPONSE_ITEMS; `--all` accounts for that clamp, so
 combining them is safe.
+
+`issue comment list` and `pr comments` return the full comment list in one
+request. They accept `--all`, `--page` and `--per-page` for compatibility.
 
 ## Dry-Run Mode
 
