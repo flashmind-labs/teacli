@@ -88,12 +88,12 @@ func releaseServer(t *testing.T, tag string, assets map[string][]byte, wantToken
 			return
 		}
 
-		if r.URL.Path == "/api/v1/repos/rayfish/teacli/releases/latest" {
+		if r.URL.Path == "/api/v1/repos/flashmind-labs/teacli/releases/latest" {
 			fmt.Fprintf(w, `{"tag_name":%q}`, tag)
 			return
 		}
 
-		prefix := "/rayfish/teacli/releases/download/" + tag + "/"
+		prefix := "/flashmind-labs/teacli/releases/download/" + tag + "/"
 		if name, ok := trimPrefix(r.URL.Path, prefix); ok {
 			if body, found := assets[name]; found {
 				w.Write(body)
@@ -117,7 +117,7 @@ func TestUpdaterLatestTag(t *testing.T) {
 	srv := releaseServer(t, "v9.9.9", nil, "")
 	defer srv.Close()
 
-	up := &updater{host: srv.URL, repo: "rayfish/teacli", client: srv.Client()}
+	up := &updater{host: srv.URL, repo: "flashmind-labs/teacli", client: srv.Client()}
 
 	tag, err := up.latestTag()
 	if err != nil {
@@ -135,7 +135,7 @@ func TestUpdaterLatestTagOnMissingRelease(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	up := &updater{host: srv.URL, repo: "rayfish/teacli", client: srv.Client()}
+	up := &updater{host: srv.URL, repo: "flashmind-labs/teacli", client: srv.Client()}
 
 	if _, err := up.latestTag(); err == nil {
 		t.Fatal("expected an error when no release exists")
@@ -146,7 +146,7 @@ func TestUpdaterSendsToken(t *testing.T) {
 	srv := releaseServer(t, "v1.0.0", map[string][]byte{"teacli-linux-amd64": []byte("payload")}, "secret-token")
 	defer srv.Close()
 
-	up := &updater{host: srv.URL, repo: "rayfish/teacli", token: "secret-token", client: srv.Client()}
+	up := &updater{host: srv.URL, repo: "flashmind-labs/teacli", token: "secret-token", client: srv.Client()}
 
 	got, err := up.fetchAsset("v1.0.0", "teacli-linux-amd64")
 	if err != nil {
@@ -157,7 +157,7 @@ func TestUpdaterSendsToken(t *testing.T) {
 	}
 
 	// Without the token the same server rejects the request.
-	anon := &updater{host: srv.URL, repo: "rayfish/teacli", client: srv.Client()}
+	anon := &updater{host: srv.URL, repo: "flashmind-labs/teacli", client: srv.Client()}
 	if _, err := anon.fetchAsset("v1.0.0", "teacli-linux-amd64"); err == nil {
 		t.Error("expected an auth failure without the token")
 	}
@@ -175,8 +175,8 @@ func TestSameHost(t *testing.T) {
 func TestLatestEndpoint(t *testing.T) {
 	// GitHub serves release metadata from api.github.com, not from the host the
 	// assets are downloaded from.
-	gh := &updater{host: defaultReleaseHost, repo: "rayfish/teacli"}
-	want := "https://api.github.com/repos/rayfish/teacli/releases/latest"
+	gh := &updater{host: defaultReleaseHost, repo: "flashmind-labs/teacli"}
+	want := "https://api.github.com/repos/flashmind-labs/teacli/releases/latest"
 	if got := gh.latestEndpoint(); got != want {
 		t.Errorf("github endpoint = %q, want %q", got, want)
 	}

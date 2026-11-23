@@ -71,7 +71,7 @@ Add that directory to your PATH if needed.
 ### With the Go toolchain
 
 ```bash
-go install github.com/rayfish/teacli@latest
+go install github.com/flashmind-labs/teacli@latest
 ```
 
 ### From source
@@ -117,7 +117,7 @@ git remote:
 
 ```bash
 cd ~/work/teacli
-teacli issue list                 # rayfish/teacli
+teacli issue list                 # flashmind-labs/teacli
 teacli action get 16057           # the run id shifts into first place
 teacli repo current               # show what is inferred, and from where
 teacli issue list other/repo      # naming a repository always wins

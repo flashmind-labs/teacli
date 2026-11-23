@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rayfish/teacli/modules/errors"
+	"github.com/flashmind-labs/teacli/modules/errors"
 )
 
 // writeAtomicFile replaces regular files after a complete write. Devices and

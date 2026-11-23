@@ -1,4 +1,4 @@
-module github.com/rayfish/teacli
+module github.com/flashmind-labs/teacli
 
 go 1.23.0
 

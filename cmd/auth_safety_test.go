@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/rayfish/teacli/modules/config"
+	"github.com/flashmind-labs/teacli/modules/config"
 	"github.com/spf13/cobra"
 )
 
